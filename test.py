@@ -65,6 +65,7 @@ async def runner(uri):
             password = ""
             exchange = "deribit"
             symbol = "BTC-PERPETUAL"
+            currency = 'USDT'
             await client.logon(username, password)
             await client.subscribe("reference_data", exchange, symbol)
             await client.subscribe("market_status", exchange, symbol)
@@ -73,6 +74,8 @@ async def runner(uri):
             await client.subscribe("market_by_order", exchange, symbol)
             await client.subscribe("trade_summary", exchange, symbol)
             await client.subscribe("statistics", exchange, symbol)
+            await client.subscribe("funds", '', currency)
+            await client.subscribe("position", exchange, symbol)
             while True:
                 [obj_type, response, request_id] = await client.get_response()
                 print("obj_type={}, obj={}".format(obj_type, response))
