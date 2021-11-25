@@ -141,6 +141,16 @@ class Client:
         ]
         await self._send(request)
 
+    async def modify_order(self, source, obj):
+        """modify order"""
+        request = [
+            "modify_order",
+            obj,
+            source,
+            123,
+        ]
+        await self._send(request)
+
     async def cancel_order(self, source, obj):
         """cancel order"""
         request = [
@@ -283,7 +293,7 @@ async def runner(
                     if not latch:
                         print(obj)
                         latch = True
-                        countdown = 10
+                        countdown = 20
                         order_id = sources.next_order_id(source)
                         create_order = dict(
                             order_id=order_id,
@@ -301,6 +311,15 @@ async def runner(
                         assert countdown is not None
                         if countdown > 0:
                             countdown = countdown - 1
+
+                            if countdown == 10:
+                                assert order_id is not None
+                                modify_order = dict(
+                                    order_id=order_id,
+                                    price=obj["layer"][0] - 750,
+                                )
+                                await client.modify_order(source, modify_order)
+
                             if countdown == 0:
                                 assert order_id is not None
                                 cancel_order = dict(
