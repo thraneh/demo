@@ -141,6 +141,16 @@ class Client:
         ]
         await self._send(request)
 
+    async def cancel_order(self, source, obj):
+        """cancel order"""
+        request = [
+            "cancel_order",
+            obj,
+            source,
+            123,
+        ]
+        await self._send(request)
+
     async def next_update(self):
         """next update"""
         update = await self._receive()
@@ -187,6 +197,8 @@ async def runner(
     async with Client(uri) as client:
         try:
             latch = False
+            order_id = None
+            countdown = None
 
             market_data = {
                 "reference_data",
@@ -266,21 +278,35 @@ async def runner(
                     sources.update(source, obj)
                     await subscriptions.subscribe(client, sources)
 
-                if type_ == "top_of_book" and trading and not latch:
-                    print(obj)
-                    latch = True
-                    order_id = sources.next_order_id(source)
-                    create_order = dict(
-                        order_id=order_id,
-                        exchange=exchange,
-                        symbol=symbol,
-                        side="BUY",
-                        order_type="LIMIT",
-                        time_in_force="GTC",
-                        quantity=1,
-                        price=obj["layer"][0] - 500,
-                    )
-                    await client.create_order(source, create_order)
+                if type_ == "top_of_book" and trading:
+
+                    if not latch:
+                        print(obj)
+                        latch = True
+                        countdown = 10
+                        order_id = sources.next_order_id(source)
+                        create_order = dict(
+                            order_id=order_id,
+                            exchange=exchange,
+                            symbol=symbol,
+                            side="BUY",
+                            order_type="LIMIT",
+                            time_in_force="GTC",
+                            quantity=1,
+                            price=obj["layer"][0] - 500,
+                        )
+                        await client.create_order(source, create_order)
+
+                    if latch:
+                        assert countdown is not None
+                        if countdown > 0:
+                            countdown = countdown - 1
+                            if countdown == 0:
+                                assert order_id is not None
+                                cancel_order = dict(
+                                    order_id=order_id,
+                                )
+                                await client.cancel_order(source, cancel_order)
 
         except websockets.ConnectionClosedOK:
             print("closed ok")
