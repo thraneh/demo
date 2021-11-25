@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import itertools
 
 from collections import defaultdict
 
@@ -129,7 +130,8 @@ class Client:
     async def next_update(self):
         """next update"""
         update = await self._receive()
-        return update if len(update) == 5 else update + [0]
+        # https://stackoverflow.com/a/59141795
+        return itertools.islice(itertools.chain(update, itertools.repeat(None)), 5)
 
 
 class Subscriptions:
