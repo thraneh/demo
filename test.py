@@ -102,7 +102,6 @@ class Client:
     async def _receive(self):
         """receive a raw message"""
         message = await self.websocket.recv()
-        print(message)
         return json.loads(message)
 
     async def logon(self, username, password):
@@ -173,11 +172,43 @@ class Subscriptions:
                 del self._data[source]
 
 
-async def runner(uri, username, password, gateway, exchange, symbol, currency, trading):
+async def runner(
+    uri,
+    username,
+    password,
+    gateway,
+    exchange,
+    symbol,
+    currency,
+    trading,
+    log_market_data,
+):
     """async main"""
     async with Client(uri) as client:
         try:
             latch = False
+
+            market_data = {
+                "reference_data",
+                "market_status",
+                "top_of_book",
+                "market_by_price",
+                "market_by_order",
+                "trade_summary",
+                "statistics",
+            }
+            account_management = {
+                "funds",
+                "position",
+            }
+            order_management = {
+                "order_ack",
+                "order",
+                "trade",
+                "create_order",
+                "modify_order",
+                "cancel-order",
+            }
 
             subscriptions = Subscriptions(
                 {
@@ -212,9 +243,15 @@ async def runner(uri, username, password, gateway, exchange, symbol, currency, t
                     timestamp,
                     request_id,
                 ) = await client.next_update()
-                print(
-                    f"type={type_}, obj={obj}, source={source}, timestamp={timestamp}, request_id={request_id}"
-                )
+
+                should_log = type_ in account_management or type_ in order_management
+                if not should_log and log_market_data:
+                    should_log = type_ in market_data
+
+                if should_log:
+                    print(
+                        f"type={type_}, obj={obj}, source={source}, timestamp={timestamp}, request_id={request_id}"
+                    )
 
                 if type_ == "state":
                     sources.update(source, obj)
@@ -245,8 +282,30 @@ async def runner(uri, username, password, gateway, exchange, symbol, currency, t
         print("done")
 
 
-def main(uri, username, password, gateway, exchange, symbol, currency, trading):
-    asyncio.run(runner(uri, username, password, gateway, exchange, symbol, currency, trading))
+def main(
+    uri,
+    username,
+    password,
+    gateway,
+    exchange,
+    symbol,
+    currency,
+    trading,
+    log_market_data,
+):
+    asyncio.run(
+        runner(
+            uri,
+            username,
+            password,
+            gateway,
+            exchange,
+            symbol,
+            currency,
+            trading,
+            log_market_data,
+        )
+    )
 
 
 if __name__ == "__main__":
@@ -261,6 +320,7 @@ if __name__ == "__main__":
     parser.add_argument("--symbol", default="BTC-PERPETUAL")
     parser.add_argument("--currency", default="USDT")
     parser.add_argument("--trading", default=False)
+    parser.add_argument("--log_market_data", default=False)
     results = parser.parse_args()
     main(
         results.uri,
@@ -271,4 +331,5 @@ if __name__ == "__main__":
         results.symbol,
         results.currency,
         results.trading,
+        results.log_market_data,
     )
