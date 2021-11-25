@@ -87,25 +87,25 @@ class Client:
     async def __aexit__(self, *args, **kwargs):
         await self._conn.__aexit__(*args, **kwargs)
 
-    async def _send(self, message):
+    async def _send(self, request):
         """send a raw message"""
+        message = json.dumps(request)
+        print(message)
         await self.websocket.send(message)
 
     async def _receive(self):
         """receive a raw message"""
-        return await self.websocket.recv()
-
-    async def _request(self, request_id, request_type, request):
-        """encode request and send message"""
-        message = json.dumps([request_id, request_type, request])
-        await self._send(message)
+        message = await self.websocket.recv()
+        print(message)
+        return json.loads(message)
 
     async def logon(self, username, password):
         """logon"""
-        await self._request(123, "logon", dict(username=username, password=password))
-        message = await self._receive()
-        print(message)
-        [obj_type, response, request_id] = json.loads(message)
+        request = ["logon", dict(username=username, password=password)]
+        await self._send(request)
+        [response_type, response] = await self._receive()
+        if response_type != "logon":
+            raise RuntimeError(f"LOGON FAILED: wrong response type ({response_type})")
         if not response.get("success", False):
             reason = response.get("reason", "")
             raise RuntimeError(f"LOGON FAILED: reason={reason}")
@@ -114,22 +114,22 @@ class Client:
 
     async def subscribe(self, source, channel, exchange, symbol):
         """subscribe"""
-        await self._request(
-            123,
+        request = [
             "subscribe",
             dict(
-                source=source,
                 channel=channel,
                 exchange=exchange,
                 symbol=symbol,
             ),
-        )
+            source,
+            123,
+        ]
+        await self._send(request)
 
     async def next_update(self):
         """next update"""
-        message = await self._receive()
-        result = json.loads(message)
-        return result if len(result) == 5 else result + [0]
+        update = await self._receive()
+        return update if len(update) == 5 else update + [0]
 
 
 class Subscriptions:
@@ -194,17 +194,17 @@ async def runner(uri):
 
             while True:
                 (
-                    source,
-                    create_time,
-                    obj_type,
+                    type_,
                     obj,
+                    source,
+                    timestamp,
                     request_id,
                 ) = await client.next_update()
                 print(
-                    f"source={source}, create_time={create_time}, obj_type={obj_type}, obj={obj}, request_id={request_id}"
+                    f"type={type_}, obj={obj}, source={source}, timestamp={timestamp}, request_id={request_id}"
                 )
 
-                if obj_type == "state":
+                if type_ == "state":
                     sources.update(source, obj)
                     await subscriptions.subscribe(client, sources)
 
