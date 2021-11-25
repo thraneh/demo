@@ -244,11 +244,20 @@ async def runner(
                     request_id,
                 ) = await client.next_update()
 
-                should_log = type_ in account_management or type_ in order_management
-                if not should_log and log_market_data:
-                    should_log = type_ in market_data
+                is_market_data = type_ in market_data
+                is_account_management = type_ in account_management
+                is_order_management = type_ in order_management
 
-                if should_log:
+                is_unexpected = not (
+                    is_market_data or is_account_management or is_order_management
+                )
+
+                if (
+                    is_account_management
+                    or is_order_management
+                    or is_unexpected
+                    or (is_market_data and log_market_data)
+                ):
                     print(
                         f"type={type_}, obj={obj}, source={source}, timestamp={timestamp}, request_id={request_id}"
                     )
