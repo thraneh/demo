@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 import asyncio
-import json
 import itertools
+import json
 
 from collections import defaultdict
 
@@ -173,18 +173,11 @@ class Subscriptions:
                 del self._data[source]
 
 
-async def runner(uri):
-    """main"""
+async def runner(uri, username, password, gateway, exchange, symbol, currency, trading):
+    """async main"""
     async with Client(uri) as client:
         try:
-            username = "tbom1"
-            password = ""
-            gateway = "deribit"
-            exchange = "deribit"
-            symbol = "BTC-PERPETUAL"
-            currency = "USDT"
-
-            trading = False
+            latch = False
 
             subscriptions = Subscriptions(
                 {
@@ -227,9 +220,9 @@ async def runner(uri):
                     sources.update(source, obj)
                     await subscriptions.subscribe(client, sources)
 
-                if type_ == "top_of_book" and not trading:
+                if type_ == "top_of_book" and trading and not latch:
                     print(obj)
-                    trading = True
+                    latch = True
                     order_id = sources.next_order_id(source)
                     create_order = dict(
                         order_id=order_id,
@@ -252,4 +245,30 @@ async def runner(uri):
         print("done")
 
 
-asyncio.run(runner("ws://localhost:3456"))
+def main(uri, username, password, gateway, exchange, symbol, currency, trading):
+    asyncio.run(runner(uri, username, password, gateway, exchange, symbol, currency, trading))
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--uri", default="ws://localhost:3456")
+    parser.add_argument("--username", default="tbom1")
+    parser.add_argument("--password", default="")
+    parser.add_argument("--gateway", default="deribit")
+    parser.add_argument("--exchange", default="deribit")
+    parser.add_argument("--symbol", default="BTC-PERPETUAL")
+    parser.add_argument("--currency", default="USDT")
+    parser.add_argument("--trading", default=False)
+    results = parser.parse_args()
+    main(
+        results.uri,
+        results.username,
+        results.password,
+        results.gateway,
+        results.exchange,
+        results.symbol,
+        results.currency,
+        results.trading,
+    )
