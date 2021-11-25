@@ -41,6 +41,11 @@ class Sources:
                     return symbol in symbols
         return False
 
+    def next_order_id(self, source):
+        """fetch next available order id"""
+        tmp = self._get_source(source)
+        return tmp.get("max_order_id", 1000) + 1
+
     def _get_source(self, source):
         result = self._sources.get(source)
         if result is None:
@@ -127,6 +132,16 @@ class Client:
         ]
         await self._send(request)
 
+    async def create_order(self, source, obj):
+        """create order"""
+        request = [
+            "create_order",
+            obj,
+            source,
+            123,
+        ]
+        await self._send(request)
+
     async def next_update(self):
         """next update"""
         update = await self._receive()
@@ -164,14 +179,16 @@ async def runner(uri):
         try:
             username = "tbom1"
             password = ""
-            source = "deribit"
+            gateway = "deribit"
             exchange = "deribit"
             symbol = "BTC-PERPETUAL"
             currency = "USDT"
 
+            trading = False
+
             subscriptions = Subscriptions(
                 {
-                    source: {
+                    gateway: {
                         ("", currency): {
                             "funds",
                         },
@@ -209,6 +226,22 @@ async def runner(uri):
                 if type_ == "state":
                     sources.update(source, obj)
                     await subscriptions.subscribe(client, sources)
+
+                if type_ == "top_of_book" and not trading:
+                    print(obj)
+                    trading = True
+                    order_id = sources.next_order_id(source)
+                    create_order = dict(
+                        order_id=order_id,
+                        exchange=exchange,
+                        symbol=symbol,
+                        side="BUY",
+                        order_type="LIMIT",
+                        time_in_force="GTC",
+                        quantity=1,
+                        price=obj["layer"][0] - 500,
+                    )
+                    await client.create_order(source, create_order)
 
         except websockets.ConnectionClosedOK:
             print("closed ok")
